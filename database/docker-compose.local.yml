@@ -1,0 +1,11 @@
+# Override for local development only: publishes the MySQL port so a backend
+# running on the host (not inside Compose) can reach the database. Not used
+# by database/scripts/run_validation.mjs, which talks to the container
+# through `docker compose exec` and never needs the port exposed.
+#
+# Usage (from the database/ directory):
+#   docker compose --env-file .env -f docker-compose.db.yml -f docker-compose.local.yml up -d
+services:
+  db:
+    ports:
+      - "3306:3306"

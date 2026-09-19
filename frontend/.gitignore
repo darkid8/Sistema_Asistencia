@@ -1,0 +1,10 @@
+# Generated frontend artifacts. The lockfile is part of the delivery and is
+# never ignored.
+node_modules/
+dist/
+coverage/
+.vite/
+
+# Environment files with real values
+.env
+.env.local

@@ -1,0 +1,8 @@
+# Caddy gets and renews the TLS certificate automatically (Let's Encrypt) the
+# moment DOMAIN resolves to this server and ports 80/443 are reachable from
+# the internet. Replace DOMAIN below, or set it via the environment and run
+# `envsubst < Caddyfile.template > Caddyfile` if you prefer not to edit this
+# file directly.
+tu-dominio.com {
+	reverse_proxy frontend:8080
+}

@@ -1,0 +1,79 @@
+# Production stack: MySQL (internal only), the Go backend, the built React
+# frontend served by nginx, and Caddy in front terminating TLS.
+#
+# Caddy is the only service with a published port; everything else talks
+# over the internal Compose network by service name -- the same names the
+# app code already expects (frontend/nginx.conf proxies /api/ to
+# "backend:8080", the backend connects to MYSQL_HOST=db).
+#
+# Usage (from the project root, after creating .env from .env.prod.example):
+#   docker compose --env-file .env -f docker-compose.prod.yml up -d --build
+services:
+  db:
+    image: mysql:8.4
+    restart: unless-stopped
+    environment:
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:?required}
+      MYSQL_DATABASE: ${MYSQL_DATABASE:?required}
+      MYSQL_USER: ${MYSQL_USER:?required}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD:?required}
+    command:
+      - --character-set-server=utf8mb4
+      - --collation-server=utf8mb4_0900_ai_ci
+    healthcheck:
+      test: ["CMD-SHELL", "mysqladmin ping -h 127.0.0.1 -u root -p\"$$MYSQL_ROOT_PASSWORD\" --silent"]
+      interval: 5s
+      timeout: 5s
+      retries: 30
+      start_period: 20s
+    volumes:
+      - db_data:/var/lib/mysql
+    # No ports published: only the backend, on the same Compose network,
+    # ever needs to reach it.
+
+  backend:
+    build: ./backend
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      MYSQL_HOST: db
+      MYSQL_PORT: "3306"
+      MYSQL_DATABASE: ${MYSQL_DATABASE:?required}
+      MYSQL_USER: ${MYSQL_USER:?required}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD:?required}
+      HTTP_PORT: "8080"
+      # Must be exactly the public origin the browser sees, scheme included,
+      # no trailing slash -- the CORS check in cors_middleware.go is an exact
+      # match, on purpose, so a typo here fails closed, not open.
+      ALLOWED_ORIGIN: ${ALLOWED_ORIGIN:?required}
+      TOKEN_SECRET: ${TOKEN_SECRET:?required}
+      TOKEN_TTL_MINUTE: ${TOKEN_TTL_MINUTE:-480}
+      # true because Caddy terminates TLS in front of this stack; the
+      # session cookie is only ever sent to a browser over HTTPS.
+      COOKIE_SECURE: "true"
+
+  frontend:
+    build: ./frontend
+    restart: unless-stopped
+    depends_on:
+      - backend
+
+  caddy:
+    image: caddy:2-alpine
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    depends_on:
+      - frontend
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+
+volumes:
+  db_data:
+  caddy_data:
+  caddy_config:
