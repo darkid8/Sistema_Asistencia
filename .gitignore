@@ -1,0 +1,5 @@
+.env
+.claude-dev-helper/
+node_modules/
+dist/
+build/
